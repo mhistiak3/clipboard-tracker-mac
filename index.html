@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Clipboard History</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700&display=swap');
+      
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+        background: #f5f5f7;
+        min-height: 100vh;
+        padding: 20px;
+        color: #1d1d1f;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+
+      .content {
+        padding: 24px;
+      }
+
+      .search-section {
+        margin-bottom: 24px;
+      }
+
+      .search-container {
+        position: relative;
+        background: rgba(142, 142, 147, 0.12);
+        border-radius: 10px;
+        border: 1px solid rgba(0, 0, 0, 0.04);
+        transition: all 0.2s ease;
+      }
+
+      .search-container:focus-within {
+        background: rgba(255, 255, 255, 0.9);
+        border-color: #007aff;
+      }
+
+      .search-input {
+        width: 100%;
+        padding: 12px 16px 12px 44px;
+        background: transparent;
+        border: none;
+        font-size: 16px;
+        color: #1d1d1f;
+        outline: none;
+        font-family: inherit;
+        -webkit-appearance: none;
+      }
+
+      .search-input::placeholder {
+        color: #86868b;
+      }
+
+      .search-icon {
+        position: absolute;
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 16px;
+        height: 16px;
+        opacity: 0.6;
+        pointer-events: none;
+      }
+
+      .results-header {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        margin-bottom: 20px;
+        padding: 0 4px;
+      }
+
+      .results-count {
+        font-size: 14px;
+        color: #86868b;
+        font-weight: 500;
+      }
+
+      /* History container base */
+      #history {
+        transition: all 0.3s ease;
+        min-height: 200px;
+      }
+
+      /* List view */
+      .history-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      /* Entry base styles */
+      .entry {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .entry:hover {
+        background: rgba(255, 255, 255, 0.95);
+        border-color: rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+      }
+
+      .entry:active {
+        transform: translateY(-1px);
+        transition: all 0.1s ease;
+      }
+
+      /* List entry styles */
+      .entry-list {
+        padding: 16px 20px;
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        min-height: 70px;
+      }
+
+      .entry-list .entry-meta {
+        flex-shrink: 0;
+        width: 100px;
+        text-align: left;
+      }
+
+      .entry-list .entry-content-wrapper {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .entry-list .entry-content {
+        font-size: 15px;
+        line-height: 1.4;
+        color: #1d1d1f;
+        font-weight: 400;
+        word-break: break-word;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      /* Meta information */
+      .entry-time {
+        font-size: 12px;
+        color: #86868b;
+        font-weight: 500;
+        margin-bottom: 4px;
+      }
+
+      .entry-type {
+        font-size: 10px;
+        padding: 3px 8px;
+        background: rgba(0, 122, 255, 0.1);
+        color: #007aff;
+        border-radius: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: inline-block;
+      }
+
+      /* Content type styles */
+      .entry-content.url {
+        color: #007aff;
+        font-weight: 500;
+      }
+
+      .entry-content.email {
+        color: #007aff;
+        font-weight: 500;
+      }
+
+      .entry-content.phone {
+        color: #34c759;
+        font-weight: 500;
+      }
+
+      .entry-content.text {
+        color: #1d1d1f;
+      }
+
+      .entry-content.snippet {
+        color: #1d1d1f;
+      }
+
+      /* Copy feedback */
+      .copy-feedback {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(52, 199, 89, 0.95);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 500;
+        transform: translateX(400px);
+        transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        z-index: 1000;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .copy-feedback.show {
+        transform: translateX(0);
+      }
+
+      /* Empty state */
+      .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        color: #86868b;
+      }
+
+      .empty-icon {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 20px;
+        background: rgba(142, 142, 147, 0.12);
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        opacity: 0.8;
+      }
+
+      .empty-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: #1d1d1f;
+        margin-bottom: 8px;
+      }
+
+      .empty-description {
+        font-size: 15px;
+        line-height: 1.4;
+      }
+
+      /* Dark mode */
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #1c1c1e;
+          color: #f2f2f7;
+        }
+
+        .container {
+          background: rgba(28, 28, 30, 0.95);
+        }
+
+        .search-container {
+          background: rgba(118, 118, 128, 0.24);
+          border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .search-container:focus-within {
+          background: rgba(44, 44, 46, 0.8);
+          border-color: #0a84ff;
+        }
+
+        .search-input {
+          color: #f2f2f7;
+        }
+
+        .entry {
+          background: rgba(44, 44, 46, 0.8);
+          border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .entry:hover {
+          background: rgba(58, 58, 60, 0.9);
+          border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .entry-content {
+          color: #f2f2f7 !important;
+        }
+
+        .entry-content.url {
+          color: #0a84ff !important;
+        }
+
+        .entry-content.email {
+          color: #0a84ff !important;
+        }
+
+        .entry-content.phone {
+          color: #30d158 !important;
+        }
+
+        .empty-icon {
+          background: rgba(118, 118, 128, 0.24);
+        }
+
+        .empty-title {
+          color: #f2f2f7;
+        }
+      }
+
+      /* Animations */
+      .entry {
+        animation: slideIn 0.3s ease-out both;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="content">
+        <div class="search-section">
+          <div class="search-container">
+            <svg class="search-icon" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+            </svg>
+            <input
+              type="text"
+              id="search"
+              class="search-input"
+              placeholder="Search clipboard history"
+            />
+          </div>
+        </div>
+        
+        <div class="results-header">
+          <div class="results-count" id="resultsCount">No items</div>
+        </div>
+        
+        <div id="history" class="history-list"></div>
+      </div>
+    </div>
+
+    <div class="copy-feedback" id="copyFeedback">
+      ✓ Copied to clipboard
+    </div>
+
+    <script>
+      const { ipcRenderer, clipboard } = require("electron");
+
+      let fullHistory = [];
+
+      // Listen for clipboard updates from main process
+      ipcRenderer.on("clipboard-updated", (_, history) => {
+        fullHistory = history;
+        renderHistory(history);
+        updateResultsCount(history.length);
+      });
+
+      function detectContentType(text) {
+        if (text.match(/^https?:\/\//)) return 'url';
+        if (text.match(/^\w+@\w+\.\w+/)) return 'email';
+        if (text.match(/^[+]?[\d\s\-()]+$/)) return 'phone';
+        if (text.length > 100) return 'text';
+        return 'snippet';
+      }
+
+      function formatTime(timeString) {
+        if (timeString.includes('ago') || timeString.includes('now')) {
+          return timeString;
+        }
+        
+        try {
+          const date = new Date(timeString);
+          const now = new Date();
+          const diffMs = now - date;
+          const diffMins = Math.floor(diffMs / 60000);
+          
+          if (diffMins < 1) return 'Just now';
+          if (diffMins < 60) return `${diffMins} min ago`;
+          if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
+          return date.toLocaleDateString();
+        } catch {
+          return timeString;
+        }
+      }
+
+      function showCopyFeedback() {
+        const feedback = document.getElementById('copyFeedback');
+        feedback.classList.add('show');
+        setTimeout(() => {
+          feedback.classList.remove('show');
+        }, 2000);
+      }
+
+      function updateResultsCount(count) {
+        const counter = document.getElementById('resultsCount');
+        if (count === 0) {
+          counter.textContent = 'No items';
+        } else if (count === 1) {
+          counter.textContent = '1 item';
+        } else {
+          counter.textContent = `${count} items`;
+        }
+      }
+
+      function renderHistory(data) {
+        const container = document.getElementById("history");
+        
+        // Always use list view
+        container.className = 'history-list';
+        
+        if (data.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">📋</div>
+              <div class="empty-title">No Clipboard History</div>
+              <div class="empty-description">Items you copy will appear here for easy access</div>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = "";
+        
+        data.forEach((entry, index) => {
+          const div = document.createElement("div");
+          const contentType = detectContentType(entry.text);
+          
+          // Always use list entry class
+          div.className = `entry entry-list`;
+          div.style.animationDelay = `${index * 0.05}s`;
+          
+          // List view HTML
+          div.innerHTML = `
+            <div class="entry-meta">
+              <div class="entry-time">${formatTime(entry.time)}</div>
+              <div class="entry-type">${contentType}</div>
+            </div>
+            <div class="entry-content-wrapper">
+              <div class="entry-content ${contentType}">${escapeHtml(entry.text)}</div>
+            </div>
+          `;
+          
+          // Click handler
+          div.onclick = () => {
+            clipboard.writeText(entry.text);
+            showCopyFeedback();
+            
+            // Visual feedback
+            div.style.transform = 'scale(0.98)';
+            setTimeout(() => {
+              div.style.transform = '';
+            }, 150);
+          };
+          
+          container.appendChild(div);
+        });
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      // Search functionality
+      document.getElementById("search").addEventListener("input", (e) => {
+        const query = e.target.value.toLowerCase();
+        const filtered = fullHistory.filter((item) =>
+          item.text.toLowerCase().includes(query)
+        );
+        renderHistory(filtered);
+        updateResultsCount(filtered.length);
+      });
+
+      // Demo data for testing (remove in production)
+      if (fullHistory.length === 0) {
+        const demoHistory = [
+          { time: "Just now", text: "https://developer.apple.com/design/human-interface-guidelines/" }
+        ];
+        
+        fullHistory = demoHistory;
+        renderHistory(demoHistory);
+        updateResultsCount(demoHistory.length);
+      }
+    </script>
+  </body>
+</html>
